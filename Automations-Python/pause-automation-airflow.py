@@ -9,14 +9,14 @@ import sys
 import datetime
 import psycopg2
 
-username = 'admin'
-password = 'P@ssw0rd@123'
+username = ''
+password = ''
 
 def postgres_connect():
     conn = psycopg2.connect(
                             database="airflow_ip_address", 
                             user='audit_dbadmin', 
-                            password='Qazxsw@1238756', 
+                            password='', 
                             host='batpsql-airflow-audit-dbserver-nprod.postgres.database.azure.com', 
                             port= '5432', 
                             sslmode = 'allow'
@@ -76,13 +76,21 @@ def pause_active_dags(ip,result):
         print(error)     
 
 def sf_connect():
-    pass
+    ctx = snowflake.connector.connect(user= sys.argv[1], password= sys.argv[2], account= sys.argv[3], role = sys.argv[4], warehouse= sys.argv[5], database= sys.argv[6], schema= sys.argv[7])
+    cursor_snow = ctx.cursor() 
+    return(cursor_snow)
 
-def ms_connect():
-    pass
+def ms_connect_dev():
+    driver= '{ODBC Driver 17 for SQL Server}'
+    cnxn = pyodbc.connect('DRIVER='+driver+';SERVER='+sys.argv[8]+';PORT=1433;DATABASE='+sys.argv[9]+';UID='+sys.argv[10]+';PWD='+ sys.argv[11], autocommit=True)
+    cursor_sql = cnxn.cursor()
+    return(cursor_sql)
 
 def on_hold_jobs():
-    pass
+    cursor_snow = conn_sflake()
+    command_sql = 'delete from EDP_DATA_FRESHNESS where SPOKE = '+market+';'
+    cursor_snow.execute(command_sql)
+    print("Deleted old record of spoke")
 
 def main():
     print(str(datetime.datetime.now())+": Pausing DAGs on Airflow Started")

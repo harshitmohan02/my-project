@@ -1,14 +1,14 @@
-# from ipaddress import ip_address
-# from urllib import response
-# import requests
-# from requests.auth import HTTPBasicAuth
-# import urllib3
-# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# import json
-# import sys
-# import datetime
-# import psycopg2
-# import snowflake.connector
+from ipaddress import ip_address
+from urllib import response
+import requests
+from requests.auth import HTTPBasicAuth
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import json
+import sys
+import datetime
+import psycopg2
+import snowflake.connector
 import pyodbc
 
 
@@ -60,7 +60,7 @@ def fetch_active_dags(ip):
             print(str(datetime.datetime.now())+": Completed Fetching DAGs on IP:" +ip[m][1])
             pause_active_dags(ip[m][1],result)
     except Exception as e:
-            print("Error: " + str(e))
+            print(str(datetime.datetime.now())+": Error: " + str(e))
     
 
 
@@ -75,42 +75,62 @@ def pause_active_dags(ip,result):
         dag_unpause.raise_for_status()
         print(str(datetime.datetime.now())+": All Active DAGs Paused on IP: " + str(ip))
     except requests.exceptions.HTTPError as e:
-        error = "Error: "+ str(e)
-        print(error)     
+        print(str(datetime.datetime.now())+": Error: " + str(e))     
 
 def conn_sflake():
-    #ctx = snowflake.connector.connect(user= sys.argv[1], password= sys.argv[2], account= sys.argv[3], role = sys.argv[4], warehouse= sys.argv[5], database= sys.argv[6], schema= sys.argv[7])
-    ctx = snowflake.connector.connect(user= 'devops_app', password= '', account= 'fx54096.west-europe.azure', role = 'EDP_MONITORING_ENGINEER_FR', warehouse= 'EDP_MONITORING_SERVICE_ELT_WH', database= 'EDP_MONITORING_PRESENTATION', schema= 'MAIN')
+    ctx = snowflake.connector.connect(user= sys.argv[1], password= sys.argv[2], account= sys.argv[3], role = sys.argv[4], warehouse= sys.argv[5], database= sys.argv[6], schema= sys.argv[7])
     cursor_snow = ctx.cursor() 
     return(cursor_snow)
 
 def ms_connect_dev(market):
     driver= '{ODBC Driver 17 for SQL Server}'
-    #cnxn = pyodbc.connect('DRIVER='+driver+';SERVER='+sys.argv[8]+';PORT=1433;DATABASE='+sys.argv[9]+';UID='+sys.argv[10]+';PWD='+ sys.argv[11], autocommit=True)
-    cnxn = pyodbc.connect('DRIVER='+driver+';SERVER=batsql-pp-we-edp-wscp-dev-01.database.windows.net;PORT=1433;DATABASE=WS_'+market+'_DEV;UID=wscp_dev_admin;PWD=', autocommit=True)
+    cnxn = pyodbc.connect('DRIVER='+driver+';SERVER='+sys.argv[8]+';PORT=1433;DATABASE='+sys.argv[9]+';UID='+sys.argv[10]+';PWD='+ sys.argv[11], autocommit=True)
     cursor_sql = cnxn.cursor()
     return(cursor_sql)
 
-def on_hold_jobs():
-    # cursor_snow = conn_sflake()
-    # command_sql = 'select SPOKE_NAME from SPOKE_VM;'
-    # cursor_snow.execute(command_sql)
-    # value = command_sql.fetchall()
-    # print(value)
+def ms_connect_test(market):
+    driver= '{ODBC Driver 17 for SQL Server}'
+    cnxn = pyodbc.connect('DRIVER='+driver+';SERVER='+sys.argv[8]+';PORT=1433;DATABASE='+sys.argv[9]+';UID='+sys.argv[10]+';PWD='+ sys.argv[11], autocommit=True)
+    cursor_sql = cnxn.cursor()
+    return(cursor_sql)
 
-    value = ['GTR']
+def pause_jobs():
+    try:
+        cursor_snow = conn_sflake()
+        command_sql = 'select SPOKE_NAME from SPOKE_VM;'
+        cursor_snow.execute(command_sql)
+        value = cursor_snow.fetchall()
 
-    for i in value:
-        cursor_mssql = ms_connect_dev(i)
-        command_sql = "UPDATE ws_wrk_job_ctrl SET wjc_status = 'H';"
-        cursor_mssql.execute(command_sql)
+        for i in value:
+            try:
+                cursor_mssql = ms_connect_dev(i[0])
+                command_sql = "UPDATE ws_wrk_job_ctrl SET wjc_status = 'H';"
+                cursor_mssql.execute(command_sql)
+                print(str(datetime.datetime.now())+": All DEV Waiting Jobs in put On-Hold for Market: " + str(i[0]))
+            except Exception as e:
+                print(str(datetime.datetime.now())+": Error : "+str(e))
+                continue
 
+        for i in value:
+            try:
+                cursor_mssql = ms_connect_test(i[0])
+                command_sql = "UPDATE ws_wrk_job_ctrl SET wjc_status = 'H';"
+                cursor_mssql.execute(command_sql)
+                print(str(datetime.datetime.now())+": All TEST Waiting Jobs in put On-Hold for Market: " + str(i[0]))
+            except Exception as e:
+                print(str(datetime.datetime.now())+": Error : "+str(e))
+                continue
+    except Exception as e:
+        print(str(datetime.datetime.now())+": Error :" + str(e))    
 def main():
-    # print(str(datetime.datetime.now())+": Pausing DAGs on Airflow Started")
-    # postgres_connect()
-    # print(str(datetime.datetime.now())+": Pausing DAGs on Airflow Completed")
-    # print("###############")
-    # print(str(datetime.datetime.now())+": Pausing DAGs on WhereScape Started")
-    on_hold_jobs()
+    print(str(datetime.datetime.now())+": Pausing DAGs on Airflow DEV and TEST Started")
+    postgres_connect()
+    print(str(datetime.datetime.now())+": Pausing DAGs on Airflow DEV and TEST Completed")
+    print("###############")
+    print(str(datetime.datetime.now())+": Pausing DAGs on WhereScape DEV and TEST Started")
+    pause_jobs()
+    print(str(datetime.datetime.now())+": Pausing DAGs on WhereScape DEV and TEST Completed")
+
+    
 
 main()
